@@ -24,12 +24,15 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# CORS configuration to allow local frontend access
-CORS(app, supports_credentials=True, origins=['http://localhost:3000'])
+# UPDATED CORS: Replace the URL with your actual Vercel deployment URL
+CORS(app, supports_credentials=True, origins=[
+    'http://localhost:3000', 
+    'https://feedback-analyzer-frontend.vercel.app' # Replace with your Vercel URL
+])
 
 # MongoDB Setup
 client = MongoClient(os.getenv('MONGODB_URI'))
-db = client.get_database()  # Connects to the database specified in your URI
+db = client.get_database()
 users_col = db.users
 feedback_col = db.feedback
 
@@ -99,8 +102,6 @@ def login():
 def submit_feedback():
     data = request.get_json()
     feedback_text = data['feedback_text']
-    
-    # Use Gemini API for NLP and Sentiment Analysis
     analysis = nlp_engine.analyze_with_gemini(feedback_text)
     is_urgent = alert_system.check_urgent(feedback_text)
     
@@ -118,7 +119,7 @@ def submit_feedback():
         'timestamp': datetime.utcnow()
     }
     
-    feedback_col.insert_one(feedback_doc) # Insert into MongoDB feedback collection
+    feedback_col.insert_one(feedback_doc)
     return jsonify({'success': True, 'message': 'Feedback processed by AI'}), 201
 
 @app.route('/api/feedback', methods=['GET'])
@@ -134,11 +135,12 @@ def get_feedback():
     return jsonify({'success': True, 'feedbacks': feedbacks}), 200
 
 if __name__ == '__main__':
-    # Initial setup for default admin
     if not users_col.find_one({"username": "admin"}):
         users_col.insert_one({
             "username": "admin",
             "password_hash": generate_password_hash("admin123"),
             "role": "admin"
         })
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    # Render requires the app to listen on a port provided by the environment
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, port=port, host='0.0.0.0')

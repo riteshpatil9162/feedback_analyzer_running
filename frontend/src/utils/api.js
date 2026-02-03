@@ -1,54 +1,40 @@
 import axios from 'axios';
 
-// Create axios instance with default config
-// In development, use the proxy defined in package.json
-// In production, use the REACT_APP_API_URL environment variable
+// The baseURL should point to your live Render backend URL
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '',
-  timeout: 10000,
-  withCredentials: true, // Enable cookies for session management
+  baseURL: 'https://feedback-analyzer-running-1.onrender.com', 
+  timeout: 30000, // Increased timeout for AI processing on cold starts
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    console.log(`Making ${config.method.toUpperCase()} request to ${config.url}`);
-    // If FormData is being sent, remove Content-Type header to let axios set it with boundary
+    // Helpful for debugging deployment connection issues
+    console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`);
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('API Error:', error);
+    console.error('Production API Error:', error);
     if (error.response) {
-      // Server responded with error status
-      console.error('Error response:', error.response.data);
-      console.error('Error status:', error.response.status);
+      console.error('Status:', error.response.status, 'Data:', error.response.data);
     } else if (error.request) {
-      // Request was made but no response received
-      console.error('No response received:', error.request);
-      error.message = 'Unable to connect to the server. Please make sure the backend is running on http://localhost:5000';
-    } else {
-      // Something else happened
-      console.error('Error:', error.message);
+      // If Render backend is sleeping (Free Tier), this error might trigger
+      console.error('No response from Render backend. Server may be starting up...');
+      error.message = 'Backend server is starting up. Please try again in 30 seconds.';
     }
     return Promise.reject(error);
   }
 );
 
 export default api;
-
